@@ -1,7 +1,6 @@
 package termenv
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/rivo/uniseg"
@@ -53,7 +52,16 @@ func (t Style) Styled(s string) string {
 		return s
 	}
 
-	return fmt.Sprintf("%s%sm%s%sm", CSI, seq, s, CSI+ResetSeq)
+	var sb strings.Builder
+	sb.Grow(len(CSI)*2 + len(s) + len(ResetSeq) + len(seq))
+	sb.WriteString(CSI)
+	sb.WriteString(seq)
+	sb.WriteString("m")
+	sb.WriteString(s)
+	sb.WriteString(CSI)
+	sb.WriteString(ResetSeq)
+	sb.WriteString("m")
+	return sb.String()
 }
 
 // Foreground sets a foreground color.
