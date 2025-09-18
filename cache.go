@@ -18,7 +18,7 @@ var (
 // It initializes the cache with default capacity on first call.
 func GetRGBCache() *RGBCache {
 	once.Do(func() {
-		globalRGBCache = NewRGBCache(10)
+		globalRGBCache = NewRGBCache(20)
 	})
 	return globalRGBCache
 }
