@@ -24,14 +24,16 @@ const (
 type Style struct {
 	profile Profile
 	string
-	styles []string
+	styles   []string
+	rgbCache *RGBCache
 }
 
 // String returns a new Style.
 func String(s ...string) Style {
 	return Style{
-		profile: ANSI,
-		string:  strings.Join(s, " "),
+		profile:  ANSI,
+		string:   strings.Join(s, " "),
+		rgbCache: NewRGBCache(5),
 	}
 }
 
@@ -58,7 +60,22 @@ func (t Style) Styled(s string) string {
 
 // Foreground sets a foreground color.
 func (t Style) Foreground(c Color) Style {
-	if c != nil {
+	if c == nil {
+		return t
+	}
+
+	var seq string
+	if rgb, ok := c.(RGBColor); ok {
+		cache := GetRGBCache()
+		if s, ok := cache.Get(rgb); ok {
+			t.styles = append(t.styles, s)
+			seq = s
+		} else {
+			seq = rgb.Sequence(false)
+			t.styles = append(t.styles, seq)
+		}
+		cache.Set(rgb, seq)
+	} else {
 		t.styles = append(t.styles, c.Sequence(false))
 	}
 	return t
