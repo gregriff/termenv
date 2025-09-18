@@ -3,7 +3,6 @@ package termenv
 import (
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 func init() {
@@ -25,19 +24,20 @@ func GetRGBCache() *RGBCache {
 }
 
 type RGBCache struct {
-	data     sync.Map
-	capacity int
-	size     int64 // atomic counter
+	data sync.Map
+	capacity,
+	size,
+	counter int64 // atomic counters
 }
 
 type entry struct {
-	value    string
-	lastUsed int64 // nanosecond timestamp for better precision
+	value      string
+	lastAccess int64
 }
 
 func NewRGBCache(capacity int) *RGBCache {
 	return &RGBCache{
-		capacity: capacity,
+		capacity: int64(capacity),
 	}
 }
 
@@ -48,35 +48,34 @@ func (c *RGBCache) Get(key RGBColor) (string, bool) {
 	}
 
 	e := val.(*entry)
-	// Update access time
-	atomic.StoreInt64(&e.lastUsed, time.Now().UnixNano())
+	atomic.StoreInt64(&e.lastAccess, atomic.AddInt64(&c.counter, 1))
 
 	return e.value, true
 }
 
 func (c *RGBCache) Put(key RGBColor, value string) {
-	now := time.Now().UnixNano()
+	accessNum := atomic.AddInt64(&c.counter, 1)
 
 	// Check if key already exists
 	if val, ok := c.data.Load(key); ok {
 		// Update existing entry
 		e := val.(*entry)
 		e.value = value
-		atomic.StoreInt64(&e.lastUsed, now)
+		atomic.StoreInt64(&e.lastAccess, accessNum)
 		return
 	}
 
 	// New entry
 	newEntry := &entry{
-		value:    value,
-		lastUsed: now,
+		value:      value,
+		lastAccess: accessNum,
 	}
 
 	c.data.Store(key, newEntry)
 	newSize := atomic.AddInt64(&c.size, 1)
 
 	// Check if we need to evict
-	if int(newSize) > c.capacity {
+	if newSize > c.capacity {
 		c.evictLRU()
 	}
 }
@@ -104,14 +103,14 @@ func (c *RGBCache) Clear() {
 // O(n) eviction - find and remove the least recently used entry
 func (c *RGBCache) evictLRU() {
 	var oldestKey interface{}
-	var oldestTime int64 = time.Now().UnixNano()
+	var oldestAccess int64 = atomic.LoadInt64(&c.counter) + 1 // start with max
 
 	c.data.Range(func(key, value interface{}) bool {
 		e := value.(*entry)
-		lastUsed := atomic.LoadInt64(&e.lastUsed)
+		lastAccess := atomic.LoadInt64(&e.lastAccess)
 
-		if lastUsed < oldestTime {
-			oldestTime = lastUsed
+		if lastAccess < oldestAccess {
+			oldestAccess = lastAccess
 			oldestKey = key
 		}
 		return true
