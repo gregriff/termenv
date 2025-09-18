@@ -6,21 +6,31 @@ import (
 )
 
 func init() {
-	GetRGBCache()
+	GetRGBSequenceCache()
+	GetRGBHexCache()
 }
 
 var (
-	globalRGBCache *RGBCache
-	once           sync.Once
+	globalRGBSequenceCache,
+	globalRGBHexCache *RGBCache
+	sequenceOnce,
+	hexOnce sync.Once
 )
 
-// GetRGBCache returns the global RGB cache instance.
-// It initializes the cache with default capacity on first call.
-func GetRGBCache() *RGBCache {
-	once.Do(func() {
-		globalRGBCache = NewRGBCache(20)
+// GetRGBSequenceCache returns the global RGB sequence cache instance.
+// for use by Style.Foreground
+func GetRGBSequenceCache() *RGBCache {
+	sequenceOnce.Do(func() {
+		globalRGBSequenceCache = NewRGBCache(20)
 	})
-	return globalRGBCache
+	return globalRGBSequenceCache
+}
+
+func GetRGBHexCache() *RGBCache {
+	hexOnce.Do(func() {
+		globalRGBHexCache = NewRGBCache(20)
+	})
+	return globalRGBHexCache
 }
 
 type RGBCache struct {
@@ -31,7 +41,7 @@ type RGBCache struct {
 }
 
 type entry struct {
-	value      string
+	value      interface{}
 	lastAccess int64
 }
 
@@ -41,7 +51,7 @@ func NewRGBCache(capacity int) *RGBCache {
 	}
 }
 
-func (c *RGBCache) Get(key RGBColor) (string, bool) {
+func (c *RGBCache) Get(key string) (interface{}, bool) {
 	val, ok := c.data.Load(key)
 	if !ok {
 		return "", false
@@ -53,7 +63,7 @@ func (c *RGBCache) Get(key RGBColor) (string, bool) {
 	return e.value, true
 }
 
-func (c *RGBCache) Put(key RGBColor, value string) {
+func (c *RGBCache) Put(key string, value interface{}) {
 	accessNum := atomic.AddInt64(&c.counter, 1)
 
 	// Check if key already exists
@@ -80,7 +90,7 @@ func (c *RGBCache) Put(key RGBColor, value string) {
 	}
 }
 
-func (c *RGBCache) Delete(key RGBColor) bool {
+func (c *RGBCache) Delete(key string) bool {
 	_, existed := c.data.LoadAndDelete(key)
 	if existed {
 		atomic.AddInt64(&c.size, -1)
