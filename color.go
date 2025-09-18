@@ -1,7 +1,6 @@
 package termenv
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math"
@@ -49,10 +48,6 @@ func (c ANSI256Color) String() string {
 
 // RGBColor is a hex-encoded color, e.g. "#abcdef".
 type RGBColor string
-
-func (c *RGBColor) Hash() [32]byte {
-	return sha256.Sum256([]byte(*c))
-}
 
 // ConvertToRGB converts a Color to a colorful.Color.
 func ConvertToRGB(c Color) colorful.Color {
