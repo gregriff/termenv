@@ -52,16 +52,15 @@ func (t Style) Styled(s string) string {
 		return s
 	}
 
-	var sb strings.Builder
-	sb.Grow(len(CSI)*2 + len(s) + len(ResetSeq) + len(seq))
-	sb.WriteString(CSI)
-	sb.WriteString(seq)
-	sb.WriteString("m")
-	sb.WriteString(s)
-	sb.WriteString(CSI)
-	sb.WriteString(ResetSeq)
-	sb.WriteString("m")
-	return sb.String()
+	buf := make([]byte, 0, len(CSI)*2+len(seq)+len(s)+len(ResetSeq)+2)
+	buf = append(buf, CSI...)
+	buf = append(buf, seq...)
+	buf = append(buf, "m"...)
+	buf = append(buf, s...)
+	buf = append(buf, CSI...)
+	buf = append(buf, ResetSeq...)
+	buf = append(buf, "m"...)
+	return string(buf)
 }
 
 // Foreground sets a foreground color.
