@@ -5,36 +5,41 @@ import (
 	"sync/atomic"
 )
 
+// init creates the RGB cache singletons
 func init() {
-	GetRGBSequenceCache()
-	GetRGBHexCache()
+	GetANSICache()
+	GetSRGBCache()
 }
 
 var (
-	globalRGBSequenceCache,
-	globalRGBHexCache *RGBCache
-	sequenceOnce,
-	hexOnce sync.Once
+	ansiCache,
+	sRGBCache *RGBCache
+	ansiCacheInit,
+	sRGBCacheInit sync.Once
 )
 
-// GetRGBSequenceCache returns the global RGB sequence cache instance.
-// for use by Style.Foreground
-func GetRGBSequenceCache() *RGBCache {
-	sequenceOnce.Do(func() {
-		globalRGBSequenceCache = NewRGBCache(20)
+// GetANSICache returns the global RGBColor->ANSI sequence cache instance.
+// For use by Style.Foreground, this cache maps RGBColor's to ANSI sequences
+func GetANSICache() *RGBCache {
+	ansiCacheInit.Do(func() {
+		ansiCache = NewRGBCache(20)
 	})
-	return globalRGBSequenceCache
+	return ansiCache
 }
 
-func GetRGBHexCache() *RGBCache {
-	hexOnce.Do(func() {
-		globalRGBHexCache = NewRGBCache(20)
+// GetSRGBCache returns the global RGBColor->sRGB cache instance.
+// For use by Style.Styled, this cache maps RGBColor's to colorful.Color structs (stores sRGB data)
+func GetSRGBCache() *RGBCache {
+	sRGBCacheInit.Do(func() {
+		sRGBCache = NewRGBCache(20)
 	})
-	return globalRGBHexCache
+	return sRGBCache
 }
 
+// RGBCache caches computed data given an RGBColor
 type RGBCache struct {
 	data sync.Map
+
 	capacity,
 	size,
 	counter int64 // atomic counters
@@ -51,7 +56,8 @@ func NewRGBCache(capacity int) *RGBCache {
 	}
 }
 
-func (c *RGBCache) Get(key string) (interface{}, bool) {
+// Get retrieves a value if key is present and increases the total access count by one
+func (c *RGBCache) Get(key RGBColor) (interface{}, bool) {
 	val, ok := c.data.Load(key)
 	if !ok {
 		return "", false
@@ -63,12 +69,11 @@ func (c *RGBCache) Get(key string) (interface{}, bool) {
 	return e.value, true
 }
 
-func (c *RGBCache) Put(key string, value interface{}) {
+// Put places a key into the cache if its not already there. It also increments the entry's counter
+func (c *RGBCache) Put(key RGBColor, value interface{}) {
 	accessNum := atomic.AddInt64(&c.counter, 1)
 
-	// Check if key already exists
 	if val, ok := c.data.Load(key); ok {
-		// Update existing entry
 		e := val.(*entry)
 		e.value = value
 		atomic.StoreInt64(&e.lastAccess, accessNum)
@@ -90,27 +95,30 @@ func (c *RGBCache) Put(key string, value interface{}) {
 	}
 }
 
-func (c *RGBCache) Delete(key string) bool {
-	_, existed := c.data.LoadAndDelete(key)
-	if existed {
-		atomic.AddInt64(&c.size, -1)
-	}
-	return existed
-}
+// Delete removes an item from the cache
+// func (c *RGBCache) Delete(key RGBColor) bool {
+// 	_, existed := c.data.LoadAndDelete(key)
+// 	if existed {
+// 		atomic.AddInt64(&c.size, -1)
+// 	}
+// 	return existed
+// }
 
-func (c *RGBCache) Len() int {
-	return int(atomic.LoadInt64(&c.size))
-}
+// Len returns the number of items in the cache atomically
+// func (c *RGBCache) Len() int {
+// 	return int(atomic.LoadInt64(&c.size))
+// }
 
-func (c *RGBCache) Clear() {
-	c.data.Range(func(key, value interface{}) bool {
-		c.data.Delete(key)
-		return true
-	})
-	atomic.StoreInt64(&c.size, 0)
-}
+// Clear empties the cache. Untested
+// func (c *RGBCache) Clear() {
+// 	c.data.Range(func(key, value interface{}) bool {
+// 		c.data.Delete(key)
+// 		return true
+// 	})
+// 	atomic.StoreInt64(&c.size, 0)
+// }
 
-// O(n) eviction - find and remove the least recently used entry
+// evictLRU performs O(n) eviction - finds and removes the least recently used entry
 func (c *RGBCache) evictLRU() {
 	var oldestKey interface{}
 	var oldestAccess int64 = atomic.LoadInt64(&c.counter) + 1 // start with max

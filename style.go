@@ -69,25 +69,37 @@ func (t Style) Foreground(c Color) Style {
 		return t
 	}
 
-	var seq string
-	if rgb, ok := c.(RGBColor); ok {
-		cache := GetRGBSequenceCache()
-		cacheKey := string(rgb)
-		if s, ok := cache.Get(cacheKey); ok {
-			if sequence, ok := s.(string); ok {
-				t.styles = append(t.styles, sequence)
-				seq = sequence
-			} else {
-				panic("rgbcache value type assertion failed")
-			}
-		} else {
-			seq = rgb.Sequence(false)
-			t.styles = append(t.styles, seq)
-		}
-		cache.Put(cacheKey, seq)
-	} else {
+	var (
+		rgb RGBColor
+		yes bool
+	)
+	if rgb, yes = c.(RGBColor); !yes {
 		t.styles = append(t.styles, c.Sequence(false))
+		return t
 	}
+
+	var (
+		seq     string
+		s       interface{}
+		present bool
+	)
+	cache := GetANSICache()
+	if s, present = cache.Get(rgb); present {
+		if sequence, ok := s.(string); ok {
+			t.styles = append(t.styles, sequence)
+			seq = sequence
+		} else {
+			panic("rgbcache value type assertion failed")
+		}
+	} else {
+		present = false
+		seq = rgb.Sequence(false)
+		t.styles = append(t.styles, seq)
+	}
+	if !present {
+		cache.Put(rgb, seq)
+	}
+
 	return t
 }
 
