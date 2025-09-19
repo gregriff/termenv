@@ -1,7 +1,6 @@
 package termenv
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/rivo/uniseg"
@@ -53,14 +52,54 @@ func (t Style) Styled(s string) string {
 		return s
 	}
 
-	return fmt.Sprintf("%s%sm%s%sm", CSI, seq, s, CSI+ResetSeq)
+	buf := make([]byte, 0, len(CSI)*2+len(seq)+len(s)+len(ResetSeq)+2)
+	buf = append(buf, CSI...)
+	buf = append(buf, seq...)
+	buf = append(buf, "m"...)
+	buf = append(buf, s...)
+	buf = append(buf, CSI...)
+	buf = append(buf, ResetSeq...)
+	buf = append(buf, "m"...)
+	return string(buf)
 }
 
 // Foreground sets a foreground color.
 func (t Style) Foreground(c Color) Style {
-	if c != nil {
-		t.styles = append(t.styles, c.Sequence(false))
+	if c == nil {
+		return t
 	}
+
+	var (
+		rgb RGBColor
+		yes bool
+	)
+	if rgb, yes = c.(RGBColor); !yes {
+		t.styles = append(t.styles, c.Sequence(false))
+		return t
+	}
+
+	var (
+		seq     string
+		s       interface{}
+		present bool
+	)
+	cache := GetANSICache()
+	if s, present = cache.Get(rgb); present {
+		if sequence, ok := s.(string); ok {
+			t.styles = append(t.styles, sequence)
+			seq = sequence
+		} else {
+			panic("rgbcache value type assertion failed")
+		}
+	} else {
+		present = false
+		seq = rgb.Sequence(false)
+		t.styles = append(t.styles, seq)
+	}
+	if !present {
+		cache.Put(rgb, seq)
+	}
+
 	return t
 }
 

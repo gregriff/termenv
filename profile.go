@@ -62,10 +62,30 @@ func (p Profile) Convert(c Color) Color {
 		return v
 
 	case RGBColor:
-		h, err := colorful.Hex(string(v))
-		if err != nil {
-			return nil
+		var (
+			h       colorful.Color
+			present bool
+			sRGB    interface{}
+			err     error
+		)
+		cache := GetSRGBCache()
+		if sRGB, present = cache.Get(v); present {
+			if sRGBColor, ok := sRGB.(colorful.Color); ok {
+				h = sRGBColor
+			} else {
+				panic("srgbCache value type assertion failed")
+			}
+		} else {
+			present = false
+			h, err = colorful.Hex(string(v))
+			if err != nil {
+				return nil
+			}
 		}
+		if !present {
+			cache.Put(v, h)
+		}
+
 		if p != TrueColor {
 			ac := hexToANSI256Color(h)
 			if p == ANSI {
