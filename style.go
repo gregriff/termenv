@@ -47,14 +47,34 @@ func (t Style) Styled(s string) string {
 		return s
 	}
 
-	seq := strings.Join(t.styles, ";")
-	if seq == "" {
+	var (
+		stylesLen = len(t.styles)
+		n         int
+	)
+	switch stylesLen {
+	case 0:
 		return s
+	case 1:
+		if t.styles[0] == "" {
+			return s
+		}
+		n = len(t.styles[0])
+	default:
+		n = (stylesLen - 1) // calcs bytes of the ascii seperator we'll use (semicolon, 1 byte)
+		for i := 0; i < stylesLen; i++ {
+			n += len(t.styles[i])
+		}
 	}
 
-	buf := make([]byte, 0, len(CSI)*2+len(seq)+len(s)+len(ResetSeq)+2)
+	buf := make([]byte, 0, len(CSI)*2+n+len(s)+len(ResetSeq)+2)
 	buf = append(buf, CSI...)
-	buf = append(buf, seq...)
+
+	buf = append(buf, t.styles[0]...)
+	for i := 1; i < len(t.styles); i++ {
+		buf = append(buf, ";"...)
+		buf = append(buf, t.styles[i]...)
+	}
+
 	buf = append(buf, "m"...)
 	buf = append(buf, s...)
 	buf = append(buf, CSI...)
