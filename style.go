@@ -98,25 +98,12 @@ func (t Style) Foreground(c Color) Style {
 		return t
 	}
 
-	var (
-		seq     string
-		s       interface{}
-		present bool
-	)
 	cache := GetANSICache()
-	if s, present = cache.Get(rgb); present {
-		if sequence, ok := s.(string); ok {
-			t.styles = append(t.styles, sequence)
-			seq = sequence
-		} else {
-			panic("rgbcache value type assertion failed")
-		}
+	if s, present := cache.Get(rgb); present {
+		t.styles = append(t.styles, s.(string))
 	} else {
-		present = false
-		seq = rgb.Sequence(false)
+		seq := rgb.Sequence(false)
 		t.styles = append(t.styles, seq)
-	}
-	if !present {
 		cache.Put(rgb, seq)
 	}
 
