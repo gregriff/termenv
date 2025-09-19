@@ -43,14 +43,10 @@ func (t Style) Styled(s string) string {
 	if t.profile == Ascii {
 		return s
 	}
-	stylesLen := len(t.styles)
-	if stylesLen == 0 {
-		return s
-	}
 
-	// calculate size of joined string
+	// calculate size of joined styles string
 	var n int
-	switch stylesLen {
+	switch numStyles := len(t.styles); numStyles {
 	case 0:
 		return s
 	case 1:
@@ -59,8 +55,8 @@ func (t Style) Styled(s string) string {
 		}
 		n = len(t.styles[0])
 	default:
-		n = (stylesLen - 1) // number of seperators we'll use (semicolon, 1 byte)
-		for i := 0; i < stylesLen; i++ {
+		n = (numStyles - 1) // number of seperators we'll use (semicolon, 1 byte)
+		for i := 0; i < numStyles; i++ {
 			n += len(t.styles[i])
 		}
 	}
