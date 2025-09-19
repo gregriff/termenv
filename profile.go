@@ -46,7 +46,7 @@ func (p Profile) String(s ...string) Style {
 }
 
 // Convert transforms a given Color to a Color supported within the Profile.
-func (p Profile) Convert(c Color) Color {
+func (p Profile) Convert(c Color, s string) Color {
 	if p == Ascii {
 		return NoColor{}
 	}
@@ -63,26 +63,22 @@ func (p Profile) Convert(c Color) Color {
 
 	case RGBColor:
 		var (
-			h       colorful.Color
-			present bool
-			sRGB    interface{}
-			err     error
+			h   colorful.Color
+			err error
 		)
 		cache := GetSRGBCache()
-		if sRGB, present = cache.Get(v); present {
-			if sRGBColor, ok := sRGB.(colorful.Color); ok {
-				h = sRGBColor
-			} else {
-				panic("srgbCache value type assertion failed")
-			}
+		if sRGB, present := cache.Get(v); present {
+			h = sRGB.(colorful.Color)
+			// if sRGBColor, ok := sRGB.(colorful.Color); ok {
+			// 	h = sRGBColor
+			// } else {
+			// 	panic("srgbCache value type assertion failed")
+			// }
 		} else {
-			present = false
-			h, err = colorful.Hex(string(v))
+			h, err = colorful.Hex(s)
 			if err != nil {
 				return nil
 			}
-		}
-		if !present {
 			cache.Put(v, h)
 		}
 
@@ -106,23 +102,23 @@ func (p Profile) Color(s string) Color {
 		return nil
 	}
 
-	var c Color
 	if strings.HasPrefix(s, "#") {
-		c = RGBColor(s)
-	} else {
-		i, err := strconv.Atoi(s)
-		if err != nil {
-			return nil
-		}
-
-		if i < 16 { //nolint:mnd
-			c = ANSIColor(i)
-		} else {
-			c = ANSI256Color(i)
-		}
+		return p.Convert(RGBColor(s), s)
 	}
 
-	return p.Convert(c)
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return nil
+	}
+
+	var c Color
+	if i < 16 { //nolint:mnd
+		c = ANSIColor(i)
+	} else {
+		c = ANSI256Color(i)
+	}
+
+	return p.Convert(c, "")
 }
 
 // FromColor creates a Color from a color.Color.
