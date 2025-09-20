@@ -69,11 +69,6 @@ func (p Profile) Convert(c Color, s string) Color {
 		cache := GetSRGBCache()
 		if sRGB, present := cache.Get(v); present {
 			h = sRGB.(colorful.Color)
-			// if sRGBColor, ok := sRGB.(colorful.Color); ok {
-			// 	h = sRGBColor
-			// } else {
-			// 	panic("srgbCache value type assertion failed")
-			// }
 		} else {
 			h, err = colorful.Hex(s)
 			if err != nil {
