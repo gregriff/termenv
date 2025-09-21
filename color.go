@@ -140,7 +140,7 @@ func (c ANSI256Color) SequenceBuf(bg bool) string {
 	if bg {
 		prefix = Background
 	}
-	buf := make([]byte, 0, len(prefix)+9+3)
+	buf := make([]byte, 0, len(prefix)+3+3)
 	buf = append(buf, prefix...)
 	buf = append(buf, ";5;"...)
 	buf = strconv.AppendInt(buf, int64(c), 10)
@@ -154,7 +154,7 @@ func (c ANSI256Color) SequenceBuilder(bg bool) string {
 		prefix = Background
 	}
 	seq := strings.Builder{}
-	seq.Grow(len(prefix) + 9 + 3)
+	seq.Grow(len(prefix) + 3 + 3)
 	seq.WriteString(prefix)
 	seq.WriteString(";5;")
 	seq.WriteString(strconv.FormatInt(int64(c), 10))
