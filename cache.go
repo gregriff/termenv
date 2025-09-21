@@ -2,7 +2,6 @@ package termenv
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 // init creates the RGB cache singletons
@@ -36,7 +35,7 @@ func GetSRGBCache() *RGBCache {
 	return sRGBCache
 }
 
-// RGBCache caches computed data given an RGBColor.
+// RGBCache caches computed data given an RGBColor. Not safe for concurrent use.
 // I added this because my TUI application renders markdown text with glamour (which calls funcs in this package)
 // many times per second over and over again. Since this is the main functionality of my TUI, I profiled this feature
 // and there were 3 funcs in termenv that were using much of the CPU time. Once I realized that my TUI would only ever
@@ -44,7 +43,7 @@ func GetSRGBCache() *RGBCache {
 // I'd create a cache for these. These caches (and one other perf tweak) led to almost a 2x reduction in CPU time for
 // the code-path I was targeting, and a 5x speedup in the direct callee of these termenv functions I modified.
 type RGBCache struct {
-	data sync.Map
+	data map[RGBColor]entry
 
 	capacity,
 	size,
@@ -52,37 +51,37 @@ type RGBCache struct {
 }
 
 type entry struct {
-	value      interface{} // go 1.18 generics would be nice to have here!
+	value      any // go 1.18 generics would be nice to have here!
 	lastAccess int64
 }
 
 func NewRGBCache(capacity int) *RGBCache {
 	return &RGBCache{
+		data:     make(map[RGBColor]entry, capacity),
 		capacity: int64(capacity),
 	}
 }
 
 // Get retrieves a value if key is present and increases the total access count by one
-func (c *RGBCache) Get(key RGBColor) (interface{}, bool) {
-	val, ok := c.data.Load(key)
+func (c *RGBCache) Get(key RGBColor) (any, bool) {
+	e, ok := c.data[key]
 	if !ok {
 		return "", false
 	}
 
-	e := val.(*entry)
-	atomic.StoreInt64(&e.lastAccess, atomic.AddInt64(&c.counter, 1))
-
+	c.counter += 1
+	e.lastAccess = c.counter
 	return e.value, true
 }
 
 // Put places a key into the cache if its not already there. It also increments the entry's counter
-func (c *RGBCache) Put(key RGBColor, value interface{}) {
-	accessNum := atomic.AddInt64(&c.counter, 1)
+func (c *RGBCache) Put(key RGBColor, value any) {
+	c.counter += 1
+	accessNum := c.counter
 
-	if val, ok := c.data.Load(key); ok {
-		e := val.(*entry)
+	if e, ok := c.data[key]; ok {
 		e.value = value
-		atomic.StoreInt64(&e.lastAccess, accessNum)
+		e.lastAccess = accessNum
 		return
 	}
 
@@ -92,11 +91,10 @@ func (c *RGBCache) Put(key RGBColor, value interface{}) {
 		lastAccess: accessNum,
 	}
 
-	c.data.Store(key, newEntry)
-	newSize := atomic.AddInt64(&c.size, 1)
+	c.data[key] = *newEntry
 
 	// Check if we need to evict
-	if newSize > c.capacity {
+	if int64(len(c.data)) >= c.capacity {
 		c.evictLRU()
 	}
 }
@@ -126,22 +124,20 @@ func (c *RGBCache) Put(key RGBColor, value interface{}) {
 
 // evictLRU performs O(n) eviction - finds and removes the least recently used entry
 func (c *RGBCache) evictLRU() {
-	var oldestKey interface{}
-	var oldestAccess int64 = atomic.LoadInt64(&c.counter) + 1 // start with max
+	var oldestKey RGBColor
+	var oldestAccess int64 = c.counter + 1 // start with max
 
-	c.data.Range(func(key, value interface{}) bool {
-		e := value.(*entry)
-		lastAccess := atomic.LoadInt64(&e.lastAccess)
+	for key, value := range c.data {
+		lastAccess := value.lastAccess
 
 		if lastAccess < oldestAccess {
 			oldestAccess = lastAccess
 			oldestKey = key
 		}
-		return true
-	})
+	}
 
-	if oldestKey != nil {
-		c.data.Delete(oldestKey)
-		atomic.AddInt64(&c.size, -1)
+	if oldestKey != "" {
+		delete(c.data, oldestKey)
+		c.size += 1
 	}
 }

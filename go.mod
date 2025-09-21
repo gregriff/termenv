@@ -1,6 +1,6 @@
 module github.com/muesli/termenv
 
-go 1.17
+go 1.20
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1

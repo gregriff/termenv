@@ -2,6 +2,7 @@ package termenv
 
 import (
 	"strings"
+	"unsafe"
 
 	"github.com/rivo/uniseg"
 )
@@ -60,8 +61,8 @@ func (t Style) Styled(s string) string {
 			n += len(t.styles[i])
 		}
 	}
-
-	buf := make([]byte, 0, len(CSI)*2+n+len(s)+len(ResetSeq)+2)
+	var bufLen = len(CSI)*2 + n + len(s) + len(ResetSeq) + 2
+	buf := make([]byte, 0, bufLen)
 	buf = append(buf, CSI...)
 
 	// join styles
@@ -76,7 +77,8 @@ func (t Style) Styled(s string) string {
 	buf = append(buf, CSI...)
 	buf = append(buf, ResetSeq...)
 	buf = append(buf, "m"...)
-	return string(buf)
+	return unsafe.String(&buf[0], bufLen)
+	// return string(buf)
 }
 
 // Foreground sets a foreground color.
