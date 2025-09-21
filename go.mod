@@ -9,3 +9,5 @@ require (
 	github.com/rivo/uniseg v0.4.7
 	golang.org/x/sys v0.30.0
 )
+
+replace github.com/lucasb-eyer/go-colorful => github.com/lucasb-eyer/go-colorful v1.3.0

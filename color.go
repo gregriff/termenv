@@ -23,6 +23,8 @@ const (
 // ANSI sequence.
 type Color interface {
 	// Sequence returns the ANSI Sequence for the color.
+	SequenceBuf(bg bool) string
+	SequenceBuilder(bg bool) string
 	Sequence(bg bool) string
 }
 
@@ -70,6 +72,12 @@ func ConvertToRGB(c Color) colorful.Color {
 func (c NoColor) Sequence(_ bool) string {
 	return ""
 }
+func (c NoColor) SequenceBuf(_ bool) string {
+	return ""
+}
+func (c NoColor) SequenceBuilder(_ bool) string {
+	return ""
+}
 
 // Sequence returns the ANSI Sequence for the color.
 //
@@ -89,6 +97,34 @@ func (c ANSIColor) Sequence(bg bool) string {
 	return fmt.Sprintf("%d", bgMod(col-8)+90) //nolint:mnd
 }
 
+func (c ANSIColor) SequenceBuf(bg bool) string {
+	col := int64(c)
+	bgMod := func(c int64) int64 {
+		if bg {
+			return c + 10
+		}
+		return c
+	}
+	if col < 8 {
+		return strconv.FormatInt(bgMod(col)+30, 10)
+	}
+	return strconv.FormatInt(bgMod(col-8)+90, 10)
+}
+
+func (c ANSIColor) SequenceBuilder(bg bool) string {
+	col := int64(c)
+	bgMod := func(c int64) int64 {
+		if bg {
+			return c + 10
+		}
+		return c
+	}
+	if col < 8 {
+		return strconv.FormatInt(bgMod(col)+30, 10)
+	}
+	return strconv.FormatInt(bgMod(col-8)+90, 10)
+}
+
 // Sequence returns the ANSI Sequence for the color.
 func (c ANSI256Color) Sequence(bg bool) string {
 	prefix := Foreground
@@ -96,6 +132,33 @@ func (c ANSI256Color) Sequence(bg bool) string {
 		prefix = Background
 	}
 	return fmt.Sprintf("%s;5;%d", prefix, c)
+}
+
+// Sequence returns the ANSI Sequence for the color.
+func (c ANSI256Color) SequenceBuf(bg bool) string {
+	prefix := Foreground
+	if bg {
+		prefix = Background
+	}
+	buf := make([]byte, 0, len(prefix)+9+3)
+	buf = append(buf, prefix...)
+	buf = append(buf, ";5;"...)
+	buf = strconv.AppendInt(buf, int64(c), 10)
+	return string(buf)
+}
+
+// Sequence returns the ANSI Sequence for the color.
+func (c ANSI256Color) SequenceBuilder(bg bool) string {
+	prefix := Foreground
+	if bg {
+		prefix = Background
+	}
+	seq := strings.Builder{}
+	seq.Grow(len(prefix) + 9 + 3)
+	seq.WriteString(prefix)
+	seq.WriteString(";5;")
+	seq.WriteString(strconv.FormatInt(int64(c), 10))
+	return seq.String()
 }
 
 // Sequence returns the ANSI Sequence for the color.
@@ -109,16 +172,58 @@ func (c RGBColor) Sequence(bg bool) string {
 	if bg {
 		prefix = Background
 	}
+	return fmt.Sprintf("%s;2;%d;%d;%d", prefix, uint8(f.R*255), uint8(f.G*255), uint8(f.B*255)) //nolint:mnd
+}
+
+// Sequence returns the ANSI Sequence for the color.
+func (c RGBColor) SequenceBuf(bg bool) string {
+	f, err := colorful.Hex(string(c))
+	if err != nil {
+		return ""
+	}
+
+	prefix := Foreground
+	if bg {
+		prefix = Background
+	}
+
+	r, g, b := int64(f.R*255), int64(f.G*255), int64(f.B*255)
 
 	buf := make([]byte, 0, len(prefix)+9+5)
 	buf = append(buf, prefix...)
 	buf = append(buf, ";2;"...)
-	buf = strconv.AppendInt(buf, int64(f.R*255), 10)
+	buf = strconv.AppendInt(buf, r, 10)
 	buf = append(buf, ";"...)
-	buf = strconv.AppendInt(buf, int64(f.G*255), 10)
+	buf = strconv.AppendInt(buf, g, 10)
 	buf = append(buf, ";"...)
-	buf = strconv.AppendInt(buf, int64(f.B*255), 10)
+	buf = strconv.AppendInt(buf, b, 10)
 	return string(buf)
+}
+
+// Sequence returns the ANSI Sequence for the color.
+func (c RGBColor) SequenceBuilder(bg bool) string {
+	f, err := colorful.Hex(string(c))
+	if err != nil {
+		return ""
+	}
+
+	prefix := Foreground
+	if bg {
+		prefix = Background
+	}
+
+	r, g, b := int64(f.R*255), int64(f.G*255), int64(f.B*255)
+
+	seq := strings.Builder{}
+	seq.Grow(len(prefix) + 9 + 5)
+	seq.WriteString(prefix)
+	seq.WriteString(";2;")
+	seq.WriteString(strconv.FormatInt(r, 10))
+	seq.WriteString(";")
+	seq.WriteString(strconv.FormatInt(g, 10))
+	seq.WriteString(";")
+	seq.WriteString(strconv.FormatInt(b, 10))
+	return seq.String()
 }
 
 func xTermColor(s string) (RGBColor, error) {
