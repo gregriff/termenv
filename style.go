@@ -61,8 +61,8 @@ func (t Style) Styled(s string) string {
 			n += len(t.styles[i])
 		}
 	}
-	var bufLen = len(CSI)*2 + n + len(s) + len(ResetSeq) + 2
-	buf := make([]byte, 0, bufLen)
+
+	buf := make([]byte, 0, len(CSI)*2+n+len(s)+len(ResetSeq)+2)
 	buf = append(buf, CSI...)
 
 	// join styles
@@ -77,8 +77,7 @@ func (t Style) Styled(s string) string {
 	buf = append(buf, CSI...)
 	buf = append(buf, ResetSeq...)
 	buf = append(buf, "m"...)
-	return unsafe.String(&buf[0], bufLen)
-	// return string(buf)
+	return unsafe.String(&buf[0], len(buf))
 }
 
 // Foreground sets a foreground color.
@@ -98,7 +97,7 @@ func (t Style) Foreground(c Color) Style {
 
 	cache := GetANSICache()
 	if s, present := cache.Get(rgb); present {
-		t.styles = append(t.styles, s.(string))
+		t.styles = append(t.styles, s)
 	} else {
 		seq := rgb.Sequence(false)
 		t.styles = append(t.styles, seq)

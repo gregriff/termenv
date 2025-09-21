@@ -92,7 +92,7 @@ func (p Profile) ConvertRGB(c RGBColor, s string) Color {
 	)
 	cache := GetSRGBCache()
 	if sRGB, present := cache.Get(c); present {
-		h = sRGB.(colorful.Color)
+		h = sRGB
 	} else {
 		h, err = colorful.Hex(s)
 		if err != nil {

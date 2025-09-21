@@ -2,6 +2,8 @@ package termenv
 
 import (
 	"sync"
+
+	"github.com/lucasb-eyer/go-colorful"
 )
 
 // init creates the RGB cache singletons
@@ -11,26 +13,26 @@ func init() {
 }
 
 var (
-	ansiCache,
-	sRGBCache *RGBCache
+	ansiCache *RGBCache[string]
+	sRGBCache *RGBCache[colorful.Color]
 	ansiCacheInit,
 	sRGBCacheInit sync.Once
 )
 
 // GetANSICache returns the global RGBColor->ANSI sequence cache instance.
 // For use by Style.Foreground, this cache maps RGBColor's to ANSI sequences
-func GetANSICache() *RGBCache {
+func GetANSICache() *RGBCache[string] {
 	ansiCacheInit.Do(func() {
-		ansiCache = NewRGBCache(20)
+		ansiCache = NewRGBCache[string](20)
 	})
 	return ansiCache
 }
 
 // GetSRGBCache returns the global RGBColor->sRGB cache instance.
 // For use by Style.Styled, this cache maps RGBColor's to colorful.Color structs (stores sRGB data)
-func GetSRGBCache() *RGBCache {
+func GetSRGBCache() *RGBCache[colorful.Color] {
 	sRGBCacheInit.Do(func() {
-		sRGBCache = NewRGBCache(20)
+		sRGBCache = NewRGBCache[colorful.Color](20)
 	})
 	return sRGBCache
 }
@@ -42,31 +44,32 @@ func GetSRGBCache() *RGBCache {
 // need a fixed number of terminal colors/styles (computed by this package every time glamour renders markdown), I figured
 // I'd create a cache for these. These caches (and one other perf tweak) led to almost a 2x reduction in CPU time for
 // the code-path I was targeting, and a 5x speedup in the direct callee of these termenv functions I modified.
-type RGBCache struct {
-	data map[RGBColor]entry
+type RGBCache[T any] struct {
+	data map[RGBColor]entry[T]
 
 	capacity,
 	size,
 	counter int64 // atomic counters
 }
 
-type entry struct {
-	value      any // go 1.18 generics would be nice to have here!
+type entry[T any] struct {
+	value      T
 	lastAccess int64
 }
 
-func NewRGBCache(capacity int) *RGBCache {
-	return &RGBCache{
-		data:     make(map[RGBColor]entry, capacity),
+func NewRGBCache[T any](capacity int) *RGBCache[T] {
+	return &RGBCache[T]{
+		data:     make(map[RGBColor]entry[T], capacity),
 		capacity: int64(capacity),
 	}
 }
 
 // Get retrieves a value if key is present and increases the total access count by one
-func (c *RGBCache) Get(key RGBColor) (any, bool) {
+func (c *RGBCache[T]) Get(key RGBColor) (T, bool) {
 	e, ok := c.data[key]
 	if !ok {
-		return "", false
+		var zero T
+		return zero, false
 	}
 
 	c.counter += 1
@@ -75,7 +78,7 @@ func (c *RGBCache) Get(key RGBColor) (any, bool) {
 }
 
 // Put places a key into the cache if its not already there. It also increments the entry's counter
-func (c *RGBCache) Put(key RGBColor, value any) {
+func (c *RGBCache[T]) Put(key RGBColor, value T) {
 	c.counter += 1
 	accessNum := c.counter
 
@@ -86,7 +89,7 @@ func (c *RGBCache) Put(key RGBColor, value any) {
 	}
 
 	// New entry
-	newEntry := &entry{
+	newEntry := &entry[T]{
 		value:      value,
 		lastAccess: accessNum,
 	}
@@ -123,7 +126,7 @@ func (c *RGBCache) Put(key RGBColor, value any) {
 // }
 
 // evictLRU performs O(n) eviction - finds and removes the least recently used entry
-func (c *RGBCache) evictLRU() {
+func (c *RGBCache[T]) evictLRU() {
 	var oldestKey RGBColor
 	var oldestAccess int64 = c.counter + 1 // start with max
 
