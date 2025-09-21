@@ -46,7 +46,7 @@ func (p Profile) String(s ...string) Style {
 }
 
 // Convert transforms a given Color to a Color supported within the Profile.
-func (p Profile) Convert(c Color, s string) Color {
+func (p Profile) Convert(c Color) Color {
 	if p == Ascii {
 		return NoColor{}
 	}
@@ -62,21 +62,10 @@ func (p Profile) Convert(c Color, s string) Color {
 		return v
 
 	case RGBColor:
-		var (
-			h   colorful.Color
-			err error
-		)
-		cache := GetSRGBCache()
-		if sRGB, present := cache.Get(v); present {
-			h = sRGB.(colorful.Color)
-		} else {
-			h, err = colorful.Hex(s)
-			if err != nil {
-				return nil
-			}
-			cache.Put(v, h)
+		h, err := colorful.Hex(string(v))
+		if err != nil {
+			return nil
 		}
-
 		if p != TrueColor {
 			ac := hexToANSI256Color(h)
 			if p == ANSI {
@@ -90,6 +79,38 @@ func (p Profile) Convert(c Color, s string) Color {
 	return c
 }
 
+// ConvertRGB transforms an RGBColor to a Color supported within the Profile.
+// It avoids unnessicary string conversions compared to Convert
+func (p Profile) ConvertRGB(c RGBColor, s string) Color {
+	if p == Ascii {
+		return NoColor{}
+	}
+
+	var (
+		h   colorful.Color
+		err error
+	)
+	cache := GetSRGBCache()
+	if sRGB, present := cache.Get(c); present {
+		h = sRGB.(colorful.Color)
+	} else {
+		h, err = colorful.Hex(s)
+		if err != nil {
+			return nil
+		}
+		cache.Put(c, h)
+	}
+
+	if p != TrueColor {
+		ac := hexToANSI256Color(h)
+		if p == ANSI {
+			return ansi256ToANSIColor(ac)
+		}
+		return ac
+	}
+	return c
+}
+
 // Color creates a Color from a string. Valid inputs are hex colors, as well as
 // ANSI color codes (0-15, 16-255).
 func (p Profile) Color(s string) Color {
@@ -98,7 +119,7 @@ func (p Profile) Color(s string) Color {
 	}
 
 	if strings.HasPrefix(s, "#") {
-		return p.Convert(RGBColor(s), s)
+		return p.ConvertRGB(RGBColor(s), s)
 	}
 
 	i, err := strconv.Atoi(s)
@@ -113,7 +134,7 @@ func (p Profile) Color(s string) Color {
 		c = ANSI256Color(i)
 	}
 
-	return p.Convert(c, "")
+	return p.Convert(c)
 }
 
 // FromColor creates a Color from a color.Color.
