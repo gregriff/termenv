@@ -2,6 +2,7 @@ package termenv
 
 import (
 	"strings"
+	"unsafe"
 
 	"github.com/rivo/uniseg"
 )
@@ -43,15 +44,10 @@ func (t Style) Styled(s string) string {
 	if t.profile == Ascii {
 		return s
 	}
-	if len(t.styles) == 0 {
-		return s
-	}
 
-	var (
-		stylesLen = len(t.styles)
-		n         int
-	)
-	switch stylesLen {
+	// calculate size of joined styles string
+	var n int
+	switch numStyles := len(t.styles); numStyles {
 	case 0:
 		return s
 	case 1:
@@ -60,8 +56,8 @@ func (t Style) Styled(s string) string {
 		}
 		n = len(t.styles[0])
 	default:
-		n = (stylesLen - 1) // calcs bytes of the ascii seperator we'll use (semicolon, 1 byte)
-		for i := 0; i < stylesLen; i++ {
+		n = (numStyles - 1) // number of seperators we'll use (semicolon, 1 byte)
+		for i := 0; i < numStyles; i++ {
 			n += len(t.styles[i])
 		}
 	}
@@ -69,6 +65,7 @@ func (t Style) Styled(s string) string {
 	buf := make([]byte, 0, len(CSI)*2+n+len(s)+len(ResetSeq)+2)
 	buf = append(buf, CSI...)
 
+	// join styles
 	buf = append(buf, t.styles[0]...)
 	for i := 1; i < len(t.styles); i++ {
 		buf = append(buf, ";"...)
@@ -80,7 +77,7 @@ func (t Style) Styled(s string) string {
 	buf = append(buf, CSI...)
 	buf = append(buf, ResetSeq...)
 	buf = append(buf, "m"...)
-	return string(buf)
+	return unsafe.String(&buf[0], len(buf))
 }
 
 // Foreground sets a foreground color.
@@ -100,7 +97,7 @@ func (t Style) Foreground(c Color) Style {
 
 	cache := GetANSICache()
 	if s, present := cache.Get(rgb); present {
-		t.styles = append(t.styles, s.(string))
+		t.styles = append(t.styles, s)
 	} else {
 		seq := rgb.Sequence(false)
 		t.styles = append(t.styles, seq)
