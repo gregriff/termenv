@@ -48,8 +48,7 @@ type RGBCache[T any] struct {
 	data map[RGBColor]entry[T]
 
 	capacity,
-	size,
-	counter int64 // atomic counters
+	counter int64
 }
 
 type entry[T any] struct {
@@ -88,12 +87,10 @@ func (c *RGBCache[T]) Put(key RGBColor, value T) {
 		return
 	}
 
-	// New entry
 	newEntry := &entry[T]{
 		value:      value,
 		lastAccess: accessNum,
 	}
-
 	c.data[key] = *newEntry
 
 	// Check if we need to evict
@@ -101,29 +98,6 @@ func (c *RGBCache[T]) Put(key RGBColor, value T) {
 		c.evictLRU()
 	}
 }
-
-// Delete removes an item from the cache
-// func (c *RGBCache) Delete(key RGBColor) bool {
-// 	_, existed := c.data.LoadAndDelete(key)
-// 	if existed {
-// 		atomic.AddInt64(&c.size, -1)
-// 	}
-// 	return existed
-// }
-
-// Len returns the number of items in the cache atomically
-// func (c *RGBCache) Len() int {
-// 	return int(atomic.LoadInt64(&c.size))
-// }
-
-// Clear empties the cache. Untested
-// func (c *RGBCache) Clear() {
-// 	c.data.Range(func(key, value interface{}) bool {
-// 		c.data.Delete(key)
-// 		return true
-// 	})
-// 	atomic.StoreInt64(&c.size, 0)
-// }
 
 // evictLRU performs O(n) eviction - finds and removes the least recently used entry
 func (c *RGBCache[T]) evictLRU() {
@@ -141,6 +115,5 @@ func (c *RGBCache[T]) evictLRU() {
 
 	if oldestKey != "" {
 		delete(c.data, oldestKey)
-		c.size += 1
 	}
 }
