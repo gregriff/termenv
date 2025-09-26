@@ -26,6 +26,7 @@ type Color interface {
 	SequenceBuf(bg bool) string
 	SequenceBuilder(bg bool) string
 	Sequence(bg bool) string
+	SequenceStack(bg bool) string
 }
 
 // NoColor is a nop for terminals that don't support colors.
@@ -79,6 +80,10 @@ func (c NoColor) SequenceBuilder(_ bool) string {
 	return ""
 }
 
+func (c NoColor) SequenceStack(_ bool) string {
+	return ""
+}
+
 // Sequence returns the ANSI Sequence for the color.
 //
 //nolint:mnd
@@ -112,6 +117,20 @@ func (c ANSIColor) SequenceBuf(bg bool) string {
 }
 
 func (c ANSIColor) SequenceBuilder(bg bool) string {
+	col := int64(c)
+	bgMod := func(c int64) int64 {
+		if bg {
+			return c + 10
+		}
+		return c
+	}
+	if col < 8 {
+		return strconv.FormatInt(bgMod(col)+30, 10)
+	}
+	return strconv.FormatInt(bgMod(col-8)+90, 10)
+}
+
+func (c ANSIColor) SequenceStack(bg bool) string {
 	col := int64(c)
 	bgMod := func(c int64) int64 {
 		if bg {
@@ -162,6 +181,19 @@ func (c ANSI256Color) SequenceBuilder(bg bool) string {
 }
 
 // Sequence returns the ANSI Sequence for the color.
+func (c ANSI256Color) SequenceStack(bg bool) string {
+	prefix := Foreground
+	if bg {
+		prefix = Background
+	}
+	buf := make([]byte, 0, 2+3+3)
+	buf = append(buf, prefix...)
+	buf = append(buf, ";5;"...)
+	buf = strconv.AppendInt(buf, int64(c), 10)
+	return string(buf)
+}
+
+// Sequence returns the ANSI Sequence for the color.
 func (c RGBColor) Sequence(bg bool) string {
 	f, err := colorful.Hex(string(c))
 	if err != nil {
@@ -198,6 +230,78 @@ func (c RGBColor) SequenceBuf(bg bool) string {
 	buf = append(buf, ";"...)
 	buf = strconv.AppendInt(buf, b, 10)
 	return string(buf)
+}
+
+// func insertPositiveRGBInt(arr []byte, pos int, num int) int {
+// 	if num == 0 {
+// 		arr[pos] = '0'
+// 		return pos + 1
+// 	}
+
+// 	var buf [3]byte // Enough for 0-255 rgb color int
+// 	i := len(buf)
+
+// 	// Convert digits
+// 	for num > 0 {
+// 		i--
+// 		buf[i] = byte(num%10) + '0'
+// 		num /= 10
+// 	}
+
+// 	// Copy to destination
+// 	copy(arr[pos:], buf[i:])
+// 	return pos + (len(buf) - i)
+// }
+//
+
+func insertRGBInt(arr [16]byte, pos int, num int64) int {
+	switch {
+	case num < 10:
+		arr[pos] = byte(num) + '0'
+		return pos + 1
+	case num < 100:
+		arr[pos] = byte(num/10) + '0'
+		arr[pos+1] = byte(num%10) + '0'
+		return pos + 2
+	default: // 100-255
+		arr[pos] = byte(num/100) + '0'
+		arr[pos+1] = byte((num/10)%10) + '0'
+		arr[pos+2] = byte(num%10) + '0'
+		return pos + 3
+	}
+}
+
+// Sequence returns the ANSI Sequence for the color.
+func (c RGBColor) SequenceStack(bg bool) string {
+	f, err := colorful.Hex(string(c))
+	if err != nil {
+		return ""
+	}
+
+	prefix := Foreground
+	if bg {
+		prefix = Background
+	}
+
+	r, g, b := int64(f.R*255), int64(f.G*255), int64(f.B*255)
+
+	var arr [16]byte // Adjust size as needed
+
+	arr[0] = prefix[0]
+	arr[1] = prefix[1]
+	arr[2] = ';'
+	arr[3] = '2'
+	arr[4] = ';'
+
+	var pos = 5
+	pos = insertRGBInt(arr, pos, r)
+	arr[pos] = ';'
+	pos = insertRGBInt(arr, pos, g)
+	arr[pos] = ';'
+	pos = insertRGBInt(arr, pos, b)
+	arr[pos] = ';'
+
+	return string(arr[:pos])
 }
 
 // Sequence returns the ANSI Sequence for the color.

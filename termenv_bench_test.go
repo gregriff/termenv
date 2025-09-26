@@ -42,6 +42,13 @@ func BenchmarkSequence(b *testing.B) {
 					color.SequenceBuf(true)
 				}
 			})
+
+			title = fmt.Sprintf("%T:[]byte-stack", color)
+			b.Run(title, func(b *testing.B) {
+				for b.Loop() {
+					color.SequenceStack(true)
+				}
+			})
 		}
 		fmt.Println()
 	}
