@@ -232,28 +232,6 @@ func (c RGBColor) SequenceBuf(bg bool) string {
 	return string(buf)
 }
 
-// func insertPositiveRGBInt(arr []byte, pos int, num int) int {
-// 	if num == 0 {
-// 		arr[pos] = '0'
-// 		return pos + 1
-// 	}
-
-// 	var buf [3]byte // Enough for 0-255 rgb color int
-// 	i := len(buf)
-
-// 	// Convert digits
-// 	for num > 0 {
-// 		i--
-// 		buf[i] = byte(num%10) + '0'
-// 		num /= 10
-// 	}
-
-// 	// Copy to destination
-// 	copy(arr[pos:], buf[i:])
-// 	return pos + (len(buf) - i)
-// }
-//
-
 func insertRGBInt(arr [16]byte, pos int, num int64) int {
 	switch {
 	case num < 10:
